@@ -8,6 +8,7 @@ from .schemes.data import ProcessRequest
 import aiofiles
 import logging
 
+
 logger = logging.getLogger('uvicorn.error')
 data_router = APIRouter(
     prefix="/api/v1/data",
