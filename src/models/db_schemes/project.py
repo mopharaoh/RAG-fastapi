@@ -17,4 +17,17 @@ class Project(BaseModel):
     
     class Config:
         arbitrary_types_allowed = True
+
+    # This method defines the indexes for the Project collection in MongoDB
+    @classmethod
+    def get_indexes(cls):
+        return [
+            {
+                "key":[
+                    ("project_id", 1)
+                ],
+                "name":"project_id_index_1",
+                "unique": True
+            }
+        ]
         
