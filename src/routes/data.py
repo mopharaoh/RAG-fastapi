@@ -1,10 +1,13 @@
-from fastapi import APIRouter,Depends, status, UploadFile
+from fastapi import APIRouter,Depends, status, UploadFile, Request
 import os
 from fastapi.responses import JSONResponse
 from helpers.config import get_settings, Settings
 from controllers import DataController,ProjectController, ProcessController
 from models import ResponseSignal
 from .schemes.data import ProcessRequest 
+from models.ProjectModel import ProjectModel
+from models.ChunkModel import ChunkModel
+from models.db_schemes import DataChunk
 import aiofiles
 import logging
 
@@ -17,8 +20,11 @@ data_router = APIRouter(
 
 
 @data_router.post("/upload/{project_id}")
-async def upload_data(project_id: str, file:UploadFile,
+async def upload_data(request: Request, project_id: str, file:UploadFile, # Request is added to access app
                        app_settings: Settings = Depends(get_settings)):
+    
+    project_model = ProjectModel(db_client=request.app.db_client)
+    project = await project_model.get_prjoct_or_create_one(project_id=project_id)
     data_controller = DataController()
     is_valid, message = data_controller.validate_upload_file(file=file)
 
@@ -43,13 +49,17 @@ async def upload_data(project_id: str, file:UploadFile,
                              content={"message": ResponseSignal.FILE_UPLOAD_FAILED.value})
     return JSONResponse(status_code=status.HTTP_200_OK,
                         content={"message": ResponseSignal.FILE_UPLOAD_SUCCESS.value
-                                 , "file_id": file_id})
+                                 , "file_id": file_id,})
 
 
 
 @data_router.post("/process/{project_id}")
-async def process(project_id: str, process_request: ProcessRequest):
+async def process(request: Request, project_id: str, process_request: ProcessRequest):
     file_id = process_request.file_id
+    do_reset = process_request.do_reset
+
+    project_model = ProjectModel(db_client=request.app.db_client)
+    project = await project_model.get_prjoct_or_create_one(project_id=project_id)
     
     process_controller = ProcessController(project_id=project_id)
     file_content = process_controller.get_file_content(file_id=file_id)
@@ -60,4 +70,24 @@ async def process(project_id: str, process_request: ProcessRequest):
     if file_chunks is None or len(file_chunks) == 0:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST,
                              content={"message": ResponseSignal.PROCESSING_FAILED.value})
-    return file_chunks
+    file_chunks_records = [
+        DataChunk(
+            chunk_text=chunk.page_content,
+            chunk_metadata=chunk.metadata,
+            chunk_order=i+1,
+            chunk_project_id=project.id,
+        )
+        for i, chunk in enumerate(file_chunks)
+    ]
+    chunk_model = ChunkModel(db_client=request.app.db_client)
+
+    if do_reset == 1:
+        _ = await chunk_model.delete_chunks_by_project_id(project_id=project.id)
+        
+
+    no_records = await chunk_model.insert_many_chunks(chunks=file_chunks_records)
+
+    return JSONResponse({
+        "message": ResponseSignal.PROCESSING_SUCCESS.value,
+        "Inserted chunks": no_records
+    })
