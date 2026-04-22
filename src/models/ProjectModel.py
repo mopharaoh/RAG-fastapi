@@ -11,7 +11,7 @@ class ProjectModel(BaseDataModel):
     async def create_project(self, project: Project):
 
         result = await self.collection.insert_one(project.dict(by_alias=True, exclude_unset=True)) # Use by_alias to ensure _id is correctly handled, and exclude_unset to avoid inserting None values
-        project._id = result.inserted_id
+        project.id = result.inserted_id
         return project
     
     async def get_prjoct_or_create_one(self,project_id: str):
