@@ -18,7 +18,7 @@ class ProjectModel(BaseDataModel):
     async def init_collection(self):
         all_collections = await self.db_client.list_collection_names()
         if DataBaseEnum.COLLECTION_PROJECT_NAME.value not in all_collections:
-            self.collection = await self.db_client[DataBaseEnum.COLLECTION_PROJECT_NAME.value]
+            self.collection = self.db_client[DataBaseEnum.COLLECTION_PROJECT_NAME.value]
             indexes = Project.get_indexes()
             for index in indexes:
                 await self.collection.create_index(
