@@ -65,8 +65,10 @@ class QdrantDBProvider(VectorDBInterface):
             _ = self.client.upload_records(
                 collection_name=collection_name,
                 records=[
-                    models.Record(vector=vector,
-                                  payload={"text":text,"metadata":metadata})
+                    models.Record(
+                        id=[record_id],
+                        vector=vector,
+                        payload={"text":text,"metadata":metadata})
                 ]
             )
         except Exception as e:
@@ -77,15 +79,15 @@ class QdrantDBProvider(VectorDBInterface):
     
     def insert_many(self, collection_name: str,texts: list,
                    vectors: list, metadata: list = None,
-                   record_id: list = None, batch_size: int =50):
+                   record_ids: list = None, batch_size: int =50):
         
         if not self.is_collection_existed(collection_name):
             self.logger.error(f"Can not insert new records to non-existed collection: {collection_name}")
             return False
         if metadata is None:
             metadata = [None] * len(texts)
-        if record_id is None:
-            record_id = [None] * len(texts)
+        if record_ids is None:
+            record_ids = list(range(0,len(texts)))
         
         for i in range(0,len(texts),batch_size):
             batch_end = i + batch_size
@@ -93,9 +95,11 @@ class QdrantDBProvider(VectorDBInterface):
             batch_texts = texts[i:batch_end]
             batch_vectors = vectors[i:batch_end]
             batch_metadata = metadata[i:batch_end]
+            batch_record_ids = record_ids[i:batch_end]
 
             batch_records = [
                 models.Record(
+                    id=batch_record_ids[x],
                     vector=batch_vectors[x],
                     payload={
                         "text":batch_texts[x],
